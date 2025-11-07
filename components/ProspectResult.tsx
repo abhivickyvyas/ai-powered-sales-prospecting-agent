@@ -48,6 +48,10 @@ const ProspectResult: React.FC<ProspectResultProps> = ({ report }) => {
   const handleDownloadPdf = () => {
     if (!report) return;
 
+    // Extract the main heading from the report to use as the title
+    const titleMatch = report.text.match(/^## (.*$)/im);
+    const reportTitle = titleMatch ? titleMatch[1].trim() : 'Prospect Report';
+
     const sourceLinksHtml = report.groundingLinks.length > 0
       ? `
       <div class="source-list">
@@ -76,7 +80,8 @@ const ProspectResult: React.FC<ProspectResultProps> = ({ report }) => {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Prospect Report</title>
+            <meta name="description" content="AI-generated sales prospect report: ${reportTitle}">
+            <title>${reportTitle}</title>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
             <style>
                 body {
