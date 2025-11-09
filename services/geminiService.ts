@@ -40,7 +40,7 @@ Based on the following query and your comprehensive knowledge, including up-to-d
 
 **Output Format (Strictly use Markdown headings and bullet points):**
 
-## Prospect Report for ${companyOrIndustry} focusing on ${focusArea}
+## Prospect Report for ${companyOrIndustry} focusing on ${focusArea}${additionalKeywords ? ` (Context: ${additionalKeywords})` : ''}
 
 ### 1. Prioritized Target Companies
 - **[Company Name 1]**: [Brief summary of why they are a good prospect, linking to buying signals and the value proposition for their specific needs. Ensure company meets $1B+ revenue, profitability, and 50+ stores criterion.]
