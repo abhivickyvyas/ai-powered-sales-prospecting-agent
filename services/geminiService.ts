@@ -13,11 +13,12 @@ const getGeminiClient = () => {
 export const generateProspectData = async (
   inputs: ProspectingFormInputs,
 ): Promise<ProspectReport> => {
-  const ai = getGeminiClient();
+  try {
+    const ai = getGeminiClient();
 
-  const { companyOrIndustry, focusArea, additionalKeywords } = inputs;
+    const { companyOrIndustry, focusArea, additionalKeywords } = inputs;
 
-  const detailedPrompt = `
+    const detailedPrompt = `
 You are an intelligent sales prospecting agent for a company providing modern inventory & order management software. Your goal is to identify high-potential prospects for OMS/IMS solutions among retailers and B2B companies with $1B+ revenue, profitability, and at least 50 store locations in North America.
 
 Based on the following query and your comprehensive knowledge, including up-to-date information from Google Search, generate a detailed prospect report. Focus on identifying specific indicators and actionable insights.
@@ -79,7 +80,6 @@ Best regards,
 Remember to position the modern OMS/IMS solution as the key for companies struggling with legacy systems that can't handle today's need for speed, scalability, and intelligence in inventory and order management.
 `;
 
-  try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: GEMINI_FLASH_MODEL,
       contents: detailedPrompt,
@@ -97,9 +97,11 @@ Remember to position the modern OMS/IMS solution as the key for companies strugg
     };
   } catch (error) {
     console.error('Error generating prospect data:', error);
-    // Specifically handle "Requested entity was not found." for API key selection
-    if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
-      throw new Error("API Key issue: Please re-select your API key. " + error.message);
+    // Consolidate API key error handling to provide a consistent error message to the UI
+    if (error instanceof Error &&
+        (error.message.includes("Requested entity was not found.") ||
+         error.message.includes("API_KEY environment variable is not set."))) {
+      throw new Error("API Key issue: Please select or re-select your API key. If the problem persists, ensure the key is valid. Original error: " + error.message);
     }
     throw new Error(`Failed to generate prospect data: ${error instanceof Error ? error.message : String(error)}`);
   }
