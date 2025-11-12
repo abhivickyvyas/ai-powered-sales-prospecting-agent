@@ -2,9 +2,6 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { GEMINI_FLASH_MODEL } from '../constants';
 import { GroundingChunk, ProspectingFormInputs, ProspectReport } from '../types';
 
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 1000; // 1 second
-
 const getGeminiClient = () => {
   // A new GoogleGenAI instance is created for each call to ensure the most up-to-date API key is used.
   if (!process.env.API_KEY) {
@@ -16,12 +13,11 @@ const getGeminiClient = () => {
 export const generateProspectData = async (
   inputs: ProspectingFormInputs,
 ): Promise<ProspectReport> => {
-  try {
-    const ai = getGeminiClient();
+  const ai = getGeminiClient();
 
-    const { companyOrIndustry, focusArea, additionalKeywords } = inputs;
+  const { companyOrIndustry, focusArea, additionalKeywords } = inputs;
 
-    const detailedPrompt = `
+  const detailedPrompt = `
 You are an intelligent sales prospecting agent for a company providing modern inventory & order management software. Your goal is to identify high-potential prospects for OMS/IMS solutions among retailers and B2B companies with $1B+ revenue, profitability, and at least 50 store locations in North America.
 
 Based on the following query and your comprehensive knowledge, including up-to-date information from Google Search, generate a detailed prospect report. Focus on identifying specific indicators and actionable insights.
@@ -83,51 +79,15 @@ Best regards,
 Remember to position the modern OMS/IMS solution as the key for companies struggling with legacy systems that can't handle today's need for speed, scalability, and intelligence in inventory and order management.
 `;
 
-    let response: GenerateContentResponse | null = null;
-    let lastError: Error | null = null;
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: GEMINI_FLASH_MODEL,
+      contents: detailedPrompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
 
-    for (let i = 0; i < MAX_RETRIES; i++) {
-      try {
-        response = await ai.models.generateContent({
-          model: GEMINI_FLASH_MODEL,
-          contents: detailedPrompt,
-          config: {
-            tools: [{ googleSearch: {} }],
-          },
-        });
-        
-        if (response) {
-          lastError = null; // Clear last error on success
-          break; // Exit loop on success
-        }
-      } catch (error) {
-        lastError = error as Error;
-        console.warn(`Attempt ${i + 1} of ${MAX_RETRIES} failed. Retrying...`, error);
-        
-        const errorMessage = lastError.message.toLowerCase();
-        // Check for retryable server-side errors
-        if (errorMessage.includes("503") || errorMessage.includes("unavailable") || errorMessage.includes("overloaded")) {
-          if (i < MAX_RETRIES - 1) {
-            // Exponential backoff
-            const delay = INITIAL_BACKOFF_MS * Math.pow(2, i);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        } else {
-          // It's not a retryable error (e.g., a 4xx client error), so break the loop.
-          break;
-        }
-      }
-    }
-    
-    // If all retries failed, throw the last captured error.
-    if (lastError) {
-      throw lastError;
-    }
-
-    if (!response) {
-      throw new Error("Failed to get a response from the model after multiple retries.");
-    }
-    
     const textOutput = response.text;
     const groundingLinks: GroundingChunk[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
@@ -137,19 +97,10 @@ Remember to position the modern OMS/IMS solution as the key for companies strugg
     };
   } catch (error) {
     console.error('Error generating prospect data:', error);
-    
-    // Provide a user-friendly message for model overload after all retries.
-    if (error instanceof Error && (error.message.includes("503") || error.message.includes("overloaded"))) {
-      throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+    // Specifically handle "Requested entity was not found." for API key selection
+    if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
+      throw new Error("API Key issue: Please re-select your API key. " + error.message);
     }
-
-    // Consolidate API key error handling to provide a consistent error message to the UI
-    if (error instanceof Error &&
-        (error.message.includes("Requested entity was not found.") ||
-         error.message.includes("API_KEY environment variable is not set."))) {
-      throw new Error("API Key issue: Please select or re-select your API key. If the problem persists, ensure the key is valid. Original error: " + error.message);
-    }
-    
     throw new Error(`Failed to generate prospect data: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
